@@ -504,14 +504,14 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to initialize client: (error = x%x)", hr);
-        Chk(hr);
+        // Chk(hr);
     }
 
     hr = stunSocket.UDPInit(socketconfig.addrLocal, RolePP, true);
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to create local socket: (error = x%x)", hr);
-        Chk(hr);
+        // Chk(hr);
     }
 
 
@@ -520,14 +520,29 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
     // sock = stunSocket.GetSocketHandle();
 
     sock = socket(AF_INET, SOCK_DGRAM, 0);
+    int enable = 1;
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
+      perror("setsockopt(SO_REUSEADDR) failed");
+    int PORT = 24573;
+
+    // set source addr info
+    struct sockaddr_in srcaddr;
+    memset(&srcaddr, 0, sizeof(srcaddr));
+    srcaddr.sin_family = AF_INET;
+    srcaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    srcaddr.sin_port = htons(PORT);
+
+    if (bind(sock, (struct sockaddr *) &srcaddr, sizeof(srcaddr)) < 0) {
+        perror("bind");
+        exit(1);
+    }
 
     // let's get a loop going!
 
     while (true)
     {
       // send UDP req to private peer
-      std::string priv_rcvr = "206.71.169.86";   // who we send to
-      int PORT = 24573;
+      std::string priv_rcvr = "98.204.46.99";   // who we send to
 
       // Setting up the sockaddr_in to connect to
       struct sockaddr_in server;
