@@ -574,11 +574,10 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
           Logging::LogMsg(LL_ALWAYS, "Received UDP: %s", udpMsg);
           // clientlogic.ProcessResponse(spMsg, addrRemote, addrLocal);
         }
+      } else {
+        Logging::LogMsg(LL_ALWAYS, "No connections received");
       }
-    } else {
-          Logging::LogMsg(LL_ALWAYS, "No connections received");
     }
-
 Cleanup:
   return hr;
 }
