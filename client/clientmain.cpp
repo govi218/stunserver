@@ -517,109 +517,69 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
 
     stunSocket.EnablePktInfoOption(true);
 
-    sock = stunSocket.GetSocketHandle();
+    // sock = stunSocket.GetSocketHandle();
+
+    sock = socket(AF_INET, SOCK_DGRAM, 0);
 
     // let's get a loop going!
 
     while (true)
     {
-        HRESULT hrRet;
-        spMsg->SetSize(0);
-        hrRet = clientlogic.GetNextMessage(spMsg, &addrDest, GetMillisecondCounter());
+      // send UDP req to private peer
+      std::string priv_rcvr = "206.71.169.86";   // who we send to
+      int PORT = 24573;
 
-        if (SUCCEEDED(hrRet))
-        {
-            addrDest.ToString(&strAddr);
-            ASSERT(spMsg->GetSize() > 0);
-            
-            if (Logging::GetLogLevel() >= LL_DEBUG)
-            {
-                std::string strAddr;
-                addrDest.ToString(&strAddr);
-                Logging::LogMsg(LL_DEBUG, "Sending message to %s", strAddr.c_str());
-            }
+      // Setting up the sockaddr_in to connect to
+      struct sockaddr_in server;
+      server.sin_family = AF_INET;
+      server.sin_port = htons(PORT);
 
-            ret = ::sendto(sock, spMsg->GetData(), spMsg->GetSize(), 0, addrDest.GetSockAddr(), addrDest.GetSockAddrLength());
+      if (inet_pton(AF_INET, priv_rcvr.c_str(), &server.sin_addr) < 0) {
+        perror("client: inet_pton");
+        return 1;
+      }
 
-            if (ret <= 0)
-            {
-                Logging::LogMsg(LL_DEBUG, "ERROR.  sendto failed (errno = %d)", errno);
-            }
-            // there's not much we can do if "sendto" fails except time out and try again
+      spMsg->SetSize(100);
+      ret = ::sendto(sock, spMsg->GetData(), spMsg->GetSize(), 0,
+                     (struct sockaddr *) &server, sizeof(server));
+
+      if (ret < 0) perror("error ");
+
+      sleep(1);
+
+      // now wait for a response
+      spMsg->SetSize(0);
+      FD_ZERO(&set);
+      FD_SET(sock, &set);
+      tv.tv_usec = 500000; // half-second
+      tv.tv_sec = config.timeoutSeconds;
+
+      ret = select(sock + 1, &set, NULL, NULL, &tv);
+      if (ret > 0) {
+        socklen_t s_len = sizeof(server);
+        ret = ::recvfrom(sock, spMsg->GetData(), spMsg->GetAllocatedSize(), 0,
+                     (struct sockaddr *) &server, &s_len);
+
+        if (ret > 0) {
+          // addrLocal.SetPort(stunSocket.GetLocalAddress()
+                                // .GetPort()); // recvfromex doesn't fill in the
+                                             // dest port value, only dest IP
+          // addrRemote.ToString(&strAddr);
+          // addrLocal.ToString(&strAddrLocal);
+          Logging::LogMsg(LL_DEBUG,
+                          "Got response (%d bytes) from %s on interface %s", ret);
+          spMsg->SetSize(ret);
+          std::string udpMsg(spMsg->GetData(),
+                             spMsg->GetData() + spMsg->GetAllocatedSize());
+          Logging::LogMsg(LL_ALWAYS, "Received UDP: %s", udpMsg);
+          // clientlogic.ProcessResponse(spMsg, addrRemote, addrLocal);
         }
-        else if (hrRet == E_STUNCLIENT_STILL_WAITING)
-        {
-            Logging::LogMsg(LL_DEBUG, "Continuing to wait for response...");
-        }
-        else if (hrRet == E_STUNCLIENT_RESULTS_READY)
-        {
-          results.Init();
-          clientlogic.GetResults(&results);
-
-          DumpResults(config, results);
-
-          sleep(5);
-
-          std::string priv_rcvr = "0.0.0.0:24573";   // who we send to
-          CSocketAddress addrDestPriv;
-          addrDestPriv.ToString(&priv_rcvr);
-
-          ret = ::sendto(sock, spMsg->GetData(), spMsg->GetSize(), 0, addrDestPriv.GetSockAddr(), addrDestPriv.GetSockAddrLength());
-
-          Logging::LogMsg(LL_DEBUG, "Sending %d bytes to priv", ret);
-
-          continue;
-        }
-        else
-        {
-            Logging::LogMsg(LL_DEBUG, "Fatal error (hr == %x)", hrRet);
-            Chk(hrRet);
-        }
-
-
-        // now wait for a response
-        spMsg->SetSize(0);
-        FD_ZERO(&set);
-        FD_SET(sock, &set);
-        tv.tv_usec = 500000; // half-second
-        tv.tv_sec = config.timeoutSeconds;
-
-        ret = select(sock+1, &set, NULL, NULL, &tv);
-        if (ret > 0)
-        {
-            ret = ::recvfromex(sock, spMsg->GetData(), spMsg->GetAllocatedSize(), MSG_DONTWAIT, &addrRemote, &addrLocal);
-            if (ret > 0)
-            {
-                addrLocal.SetPort(stunSocket.GetLocalAddress().GetPort()); // recvfromex doesn't fill in the dest port value, only dest IP
-                addrRemote.ToString(&strAddr);
-                addrLocal.ToString(&strAddrLocal);
-                Logging::LogMsg(LL_DEBUG, "Got response (%d bytes) from %s on interface %s", ret, strAddr.c_str(), strAddrLocal.c_str());
-                spMsg->SetSize(ret);
-                std::string udpMsg(
-                                   spMsg->GetData(),
-                                   spMsg->GetData() + spMsg->GetAllocatedSize());
-                Logging::LogMsg(LL_ALWAYS, "Received UDP: %s", udpMsg);
-                clientlogic.ProcessResponse(spMsg, addrRemote, addrLocal);
-            }
-        }
+      }
     }
 
-
-    // results.Init();
-    // clientlogic.GetResults(&results);
-
-    // DumpResults(config, results);
-
-
 Cleanup:
-    return hr;
+  return hr;
 }
-
-
-
-
-
-
 
 int main(int argc, char** argv)
 {
