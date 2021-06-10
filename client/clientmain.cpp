@@ -542,7 +542,7 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
     while (true)
     {
       // send UDP req to private peer
-      std::string priv_rcvr = "98.204.46.99";   // who we send to
+      std::string priv_rcvr = "206.71.169.86";   // who we send to
 
       // Setting up the sockaddr_in to connect to
       struct sockaddr_in server;
@@ -559,8 +559,6 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
                      (struct sockaddr *) &server, sizeof(server));
 
       if (ret < 0) perror("error ");
-
-      sleep(1);
 
       // now wait for a response
       spMsg->SetSize(0);
