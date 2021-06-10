@@ -130,7 +130,7 @@ HRESULT CreateConfigFromCommandLine(ClientCmdLineArgs& args, StunClientLogicConf
             }
         }
     }
-    
+
     // protocol --------------------------------------------
     StringHelper::ToLower(args.strProtocol);
     if (StringHelper::IsNullOrEmpty(args.strProtocol.c_str()) == false)
@@ -140,7 +140,7 @@ HRESULT CreateConfigFromCommandLine(ClientCmdLineArgs& args, StunClientLogicConf
             Logging::LogMsg(LL_ALWAYS, "Only udp and tcp are supported protocol versions");
             Chk(E_INVALIDARG);
         }
-        
+
         if (args.strProtocol == "tcp")
         {
             fTCP = true;
@@ -172,15 +172,15 @@ HRESULT CreateConfigFromCommandLine(ClientCmdLineArgs& args, StunClientLogicConf
         Logging::LogMsg(LL_ALWAYS, "No server address specified");
         Chk(E_INVALIDARG);
     }
-    
+
     hr = ::ResolveHostName(args.strRemoteServer.c_str(), socketconfig.family, false, &config.addrServer);
-    
+
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to resolve hostname for %s", args.strRemoteServer.c_str());
         Chk(hr);
     }
-    
+
     config.addrServer.ToStringBuffer(szIP, ARRAYSIZE(szIP));
     Logging::LogMsg(LL_DEBUG, "Resolved %s to %s", args.strRemoteServer.c_str(), szIP);
     config.addrServer.SetPort(remoteport);
@@ -330,7 +330,7 @@ void DumpResults(StunClientLogicConfig& config, StunClientResults& results)
 
 void TcpClientLoop(StunClientLogicConfig& config, ClientSocketConfig& socketconfig)
 {
-    
+
     HRESULT hr = S_OK;
     CStunSocket stunsocket;
     CStunClientLogic clientlogic;
@@ -346,19 +346,19 @@ void TcpClientLoop(StunClientLogicConfig& config, ClientSocketConfig& socketconf
     size_t readsize;
     CStunMessageReader reader;
     StunClientResults results;
-    
-   
+
+
     hr= clientlogic.Initialize(config);
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "clientlogic.Initialize failed (hr == %x)", hr);
         Chk(hr);
     }
-    
-    
+
+
     while (true)
     {
-    
+
         stunsocket.Close();
         hr = stunsocket.TCPInit(socketconfig.addrLocal, RolePP, true);
         if (FAILED(hr))
@@ -366,9 +366,9 @@ void TcpClientLoop(StunClientLogicConfig& config, ClientSocketConfig& socketconf
             Logging::LogMsg(LL_ALWAYS, "Unable to create local socket for TCP connection (hr == %x)", hr);
             Chk(hr);
         }
-        
+
         hrRet = clientlogic.GetNextMessage(spMsg, &addrDest, ::GetMillisecondCounter());
-        
+
         if (hrRet == E_STUNCLIENT_RESULTS_READY)
         {
             // clean exit
@@ -377,28 +377,28 @@ void TcpClientLoop(StunClientLogicConfig& config, ClientSocketConfig& socketconf
 
         // we should never get a "still waiting" return with TCP, because config.timeout is 0
         ASSERT(hrRet != E_STUNCLIENT_STILL_WAITING);
-        
+
         if (FAILED(hrRet))
         {
             Chk(hrRet);
         }
-        
+
         // connect to server
         sock = stunsocket.GetSocketHandle();
-        
+
         ret = ::connect(sock, addrDest.GetSockAddr(), addrDest.GetSockAddrLength());
-        
+
         if (ret == -1)
         {
             hrResult = ERRNOHR;
             Logging::LogMsg(LL_ALWAYS, "Can't connect to server (hr == %x)", hrResult);
             Chk(hrResult);
         }
-        
+
         Logging::LogMsg(LL_DEBUG, "Connected to server");
-        
+
         bytes_to_send = (int)(spMsg->GetSize());
-        
+
         bytes_sent = 0;
         pData = spMsg->GetData();
         while (bytes_sent < bytes_to_send)
@@ -412,10 +412,10 @@ void TcpClientLoop(StunClientLogicConfig& config, ClientSocketConfig& socketconf
             }
             bytes_sent += ret;
         }
-        
+
         Logging::LogMsg(LL_DEBUG, "Request sent - waiting for response");
-        
-        
+
+
         // consume the response
         reader.Reset();
         reader.GetStream().Attach(spMsgReader, true);
@@ -423,23 +423,23 @@ void TcpClientLoop(StunClientLogicConfig& config, ClientSocketConfig& socketconf
         bytes_recv = 0;
         max_bytes_recv = spMsg->GetAllocatedSize();
         remaining = max_bytes_recv;
-        
+
         while (remaining > 0)
         {
             readsize = reader.HowManyBytesNeeded();
-            
+
             if (readsize == 0)
             {
                 break;
             }
-            
+
             if (readsize > remaining)
             {
                 // technically an error, but the client logic will figure it out
                 ASSERT(false);
                 break;
             }
-            
+
             ret = ::recv(sock, pData+bytes_recv, readsize, 0);
             if (ret == 0)
             {
@@ -454,29 +454,29 @@ void TcpClientLoop(StunClientLogicConfig& config, ClientSocketConfig& socketconf
                 Logging::LogMsg(LL_ALWAYS, "Recv failed (hr == %x)", hrResult);
                 Chk(hrResult);
             }
-            
+
             reader.AddBytes(pData+bytes_recv, ret);
             bytes_recv += ret;
             remaining = max_bytes_recv - bytes_recv;
             spMsg->SetSize(bytes_recv);
         }
-        
-        
+
+
         // now feed the response into the client logic
         stunsocket.UpdateAddresses();
         addrLocal = stunsocket.GetLocalAddress();
         clientlogic.ProcessResponse(spMsg, addrDest, addrLocal);
     }
-    
+
     stunsocket.Close();
 
     results.Init();
     clientlogic.GetResults(&results);
     ::DumpResults(config, results);
-    
+
 Cleanup:
     return;
-    
+
 }
 
 
@@ -575,6 +575,8 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
           // clientlogic.ProcessResponse(spMsg, addrRemote, addrLocal);
         }
       }
+    } else {
+          Logging::LogMsg(LL_ALWAYS, "No connections received");
     }
 
 Cleanup:
@@ -589,13 +591,13 @@ int main(int argc, char** argv)
     ClientSocketConfig socketconfig;
     bool fError = false;
     uint32_t loglevel = LL_ALWAYS;
-    
+
 
 #ifdef DEBUG
     loglevel = LL_DEBUG;
 #endif
     Logging::SetLogLevel(loglevel);
-    
+
 
     cmdline.AddNonOption(&args.strRemoteServer);
     cmdline.AddNonOption(&args.strRemotePort);
@@ -613,21 +615,21 @@ int main(int argc, char** argv)
         PrintUsage(true);
         return -1;
     }
-    
+
     cmdline.ParseCommandLine(argc, argv, 1, &fError);
-    
+
     if (args.strHelp.length() > 0)
     {
         PrintUsage(false);
         return -2;
     }
-    
+
     if (fError)
     {
         PrintUsage(true);
         return -3;
     }
-    
+
 
     if (args.strVerbosity.length() > 0)
     {
@@ -646,7 +648,7 @@ int main(int argc, char** argv)
     }
 
     DumpConfig(config, socketconfig);
-    
+
     if (socketconfig.socktype == SOCK_STREAM)
     {
         TcpClientLoop(config, socketconfig);
