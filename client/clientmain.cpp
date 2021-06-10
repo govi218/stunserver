@@ -44,7 +44,7 @@ struct ClientCmdLineArgs
     std::string strProtocol;
     std::string strVerbosity;
     std::string strHelp;
-    std::string priv_recvr;
+    std::string priv_rcvr;
 };
 
 struct ClientSocketConfig
@@ -560,9 +560,9 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
 
           sleep(5);
 
-          std::string priv_recvr = "0.0.0.0:24573";   // who we send to
+          std::string priv_rcvr = "0.0.0.0:24573";   // who we send to
           CSocketAddress addrDestPriv;
-          addrDestPriv.ToString(&priv_recvr);
+          addrDestPriv.ToString(&priv_rcvr);
 
           ret = ::sendto(sock, spMsg->GetData(), spMsg->GetSize(), 0, addrDestPriv.GetSockAddr(), addrDestPriv.GetSockAddrLength());
 
