@@ -499,20 +499,20 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
 
 
     hr = clientlogic.Initialize(config);
-    
+
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to initialize client: (error = x%x)", hr);
         Chk(hr);
     }
 
-    hr = stunSocket.UDPInit(socketconfig.addrLocal, RolePP, false);
+    hr = stunSocket.UDPInit(socketconfig.addrLocal, RolePP, true);
     if (FAILED(hr))
     {
         Logging::LogMsg(LL_ALWAYS, "Unable to create local socket: (error = x%x)", hr);
         Chk(hr);
     }
-    
+
 
     stunSocket.EnablePktInfoOption(true);
 
@@ -552,7 +552,22 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
         }
         else if (hrRet == E_STUNCLIENT_RESULTS_READY)
         {
-            break;
+          results.Init();
+          clientlogic.GetResults(&results);
+
+          DumpResults(config, results);
+
+          sleep(5);
+
+          std::string priv_recvr = "0.0.0.0:24573";   // who we send to
+          CSocketAddress addrDestPriv;
+          addrDestPriv.ToString(&priv_recvr);
+
+          ret = ::sendto(sock, spMsg->GetData(), spMsg->GetSize(), 0, addrDestPriv.GetSockAddr(), addrDestPriv.GetSockAddrLength());
+
+          Logging::LogMsg(LL_DEBUG, "Sending %d bytes to priv", ret);
+
+          continue;
         }
         else
         {
@@ -579,16 +594,20 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
                 addrLocal.ToString(&strAddrLocal);
                 Logging::LogMsg(LL_DEBUG, "Got response (%d bytes) from %s on interface %s", ret, strAddr.c_str(), strAddrLocal.c_str());
                 spMsg->SetSize(ret);
+                std::string udpMsg(
+                                   spMsg->GetData(),
+                                   spMsg->GetData() + spMsg->GetAllocatedSize());
+                Logging::LogMsg(LL_ALWAYS, "Received UDP: %s", udpMsg);
                 clientlogic.ProcessResponse(spMsg, addrRemote, addrLocal);
             }
         }
     }
 
 
-    results.Init();
-    clientlogic.GetResults(&results);
+    // results.Init();
+    // clientlogic.GetResults(&results);
 
-    DumpResults(config, results);
+    // DumpResults(config, results);
 
 
 Cleanup:

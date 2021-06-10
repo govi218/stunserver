@@ -32,6 +32,3 @@ pgo2: all
 clean:	T := clean
 clean: everything
 	rm -f stunserver stunclient stuntestcode
-
-
-
