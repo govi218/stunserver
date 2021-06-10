@@ -44,6 +44,7 @@ struct ClientCmdLineArgs
     std::string strProtocol;
     std::string strVerbosity;
     std::string strHelp;
+    std::string priv_recvr;
 };
 
 struct ClientSocketConfig
@@ -644,6 +645,7 @@ int main(int argc, char** argv)
     cmdline.AddOption("family", required_argument, &args.strFamily);
     cmdline.AddOption("protocol", required_argument, &args.strProtocol);
     cmdline.AddOption("verbosity", required_argument, &args.strVerbosity);
+    cmdline.AddOption("privrcvr", required_argument, &args.priv_rcvr);
     cmdline.AddOption("help", no_argument, &args.strHelp);
 
     if (argc <= 1)
