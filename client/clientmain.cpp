@@ -523,14 +523,15 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
     int enable = 1;
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0)
       perror("setsockopt(SO_REUSEADDR) failed");
-    int PORT = 24573;
+    int sender_port = 24573;
+    int rcvr_port = 24573;
 
     // set source addr info
     struct sockaddr_in srcaddr;
     memset(&srcaddr, 0, sizeof(srcaddr));
     srcaddr.sin_family = AF_INET;
     srcaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    srcaddr.sin_port = htons(PORT);
+    srcaddr.sin_port = htons(sender_port);
 
     if (bind(sock, (struct sockaddr *) &srcaddr, sizeof(srcaddr)) < 0) {
         perror("bind");
@@ -542,12 +543,13 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
     while (true)
     {
       // send UDP req to private peer
-      std::string priv_rcvr = "206.71.169.86";   // who we send to
+      // std::string priv_rcvr = "135.84.106.98";   // who we send to
+      std::string priv_rcvr = "98.204.46.99";   // who we send to
 
       // Setting up the sockaddr_in to connect to
       struct sockaddr_in server;
       server.sin_family = AF_INET;
-      server.sin_port = htons(PORT);
+      server.sin_port = htons(rcvr_port);
 
       if (inet_pton(AF_INET, priv_rcvr.c_str(), &server.sin_addr) < 0) {
         perror("client: inet_pton");
@@ -560,11 +562,12 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
 
       if (ret < 0) perror("error ");
 
+
       // now wait for a response
       spMsg->SetSize(0);
       FD_ZERO(&set);
       FD_SET(sock, &set);
-      tv.tv_usec = 500000; // half-second
+      tv.tv_usec = 250000;
       tv.tv_sec = config.timeoutSeconds;
 
       ret = select(sock + 1, &set, NULL, NULL, &tv);
@@ -574,11 +577,6 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
                      (struct sockaddr *) &server, &s_len);
 
         if (ret > 0) {
-          // addrLocal.SetPort(stunSocket.GetLocalAddress()
-                                // .GetPort()); // recvfromex doesn't fill in the
-                                             // dest port value, only dest IP
-          // addrRemote.ToString(&strAddr);
-          // addrLocal.ToString(&strAddrLocal);
           Logging::LogMsg(LL_DEBUG,
                           "Got response (%d bytes) from %s on interface %s", ret);
           spMsg->SetSize(ret);
@@ -586,6 +584,20 @@ HRESULT UdpClientLoop(StunClientLogicConfig& config, const ClientSocketConfig& s
                              spMsg->GetData() + spMsg->GetAllocatedSize());
           Logging::LogMsg(LL_ALWAYS, "Received UDP: %s", udpMsg);
           // clientlogic.ProcessResponse(spMsg, addrRemote, addrLocal);
+
+          // get peer details
+          char host[NI_MAXHOST];
+          char port[NI_MAXSERV];
+          int error;
+          int flags = NI_NUMERICHOST | NI_NUMERICSERV;
+
+          error = getnameinfo((struct sockaddr *)&(server), sizeof(server),
+                              host, NI_MAXHOST, port, NI_MAXSERV, flags);
+
+          Logging::LogMsg(LL_ALWAYS, "Receiver info: %s:%s", host, port);
+
+          // update receiver port
+          rcvr_port = std::atoi(port);
         }
       } else {
         Logging::LogMsg(LL_ALWAYS, "No connections received");
